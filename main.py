@@ -226,3 +226,196 @@ async def cmd_start(message: types.Message, state: FSMContext):
         reply_markup=get_categories_keyboard(),
         parse_mode="HTML"
     )
+
+    # Команда помощи
+    @dp.message(Command("help"))
+    async def cmd_help(message: types.Message):
+        help_text = (
+            "📚 <b>Помощь по боту</b>\n\n"
+            "Команды:\n"
+            "/start - Начать игру и показать статистику\n"
+            "/help - Показать это сообщение\n"
+            "/stats - Показать твою статистику\n"
+            "/menu - Вернуться в главное меню\n\n"
+            "Как играть:\n"
+            "1. Выбери категорию вопросов\n"
+            "2. Отвечай на вопросы, нажимая на кнопки\n"
+            "3. За каждый правильный ответ получаешь 10 очков\n"
+            "4. В конце игры увидишь свой результат\n\n"
+            "Удачи! 🍀"
+        )
+        await message.answer(help_text, parse_mode="HTML")
+
+    # Команда статистики
+    @dp.message(Command("stats"))
+    async def cmd_stats(message: types.Message):
+        user = get_user(message.from_user.id, message.from_user.username)
+
+        stats_text = (
+            f"📊 <b>Твоя статистика</b>\n\n"
+            f"👤 Пользователь: {message.from_user.full_name}\n"
+            f"🏆 Всего очков: {user.total_score}\n"
+            f"📊 Игр сыграно: {user.games_played}\n"
+            f"✅ Правильных ответов: {user.correct_answers}\n"
+            f"❌ Неправильных ответов: {user.total_answers - user.correct_answers}\n"
+            f"📝 Всего ответов: {user.total_answers}\n"
+            f"📈 Точность: {user.correct_answers / max(user.total_answers, 1) * 100:.1f}%"
+        )
+
+        await message.answer(stats_text, parse_mode="HTML")
+
+    # Команда меню
+    @dp.message(Command("menu"))
+    async def cmd_menu(message: types.Message, state: FSMContext):
+        await state.clear()
+        await cmd_start(message, state)
+
+    # Обработчик выбора категории
+    @dp.callback_query(lambda c: c.data.startswith("cat_"))
+    async def process_category(callback: CallbackQuery, state: FSMContext):
+        category = callback.data.replace("cat_", "")
+
+        if category == "random":
+            category = random.choice(list(QUESTIONS.keys()))
+
+        # Получаем вопросы для категории и перемешиваем их
+        questions = QUESTIONS.get(category, [])
+        if not questions:
+            await callback.message.edit_text(
+                "❌ В этой категории пока нет вопросов. Выбери другую.",
+                reply_markup=get_categories_keyboard()
+            )
+            await callback.answer()
+            return
+
+        # Копируем и перемешиваем вопросы
+        shuffled_questions = random.sample(questions, len(questions))
+
+        # Создаем новую игру
+        game = GameState(category, shuffled_questions)
+
+        # Сохраняем состояние игры
+        await state.update_data(game=game)
+        await state.set_state(QuizStates.playing)
+
+        # Отправляем первый вопрос
+        await send_question(callback.message, game, state)
+        await callback.answer()
+
+    # Отправка вопроса
+    async def send_question(message: types.Message, game: GameState, state: FSMContext):
+        question = game.get_current_question()
+        if not question:
+            return
+
+        progress = f"Вопрос {game.current_index + 1} из {len(game.questions)}"
+        score_text = f"💰 Счёт: {game.score}"
+
+        question_text = (
+            f"<b>Категория: {get_category_name(game.category)}</b>\n"
+            f"{progress} | {score_text}\n\n"
+            f"❓ {question['question']}"
+        )
+
+        await message.answer(
+            question_text,
+            reply_markup=get_answers_keyboard(question['options'], game.current_index),
+            parse_mode="HTML"
+        )
+
+    # Получение названия категории
+    def get_category_name(category: str) -> str:
+        categories = {
+            "history": "История",
+            "science": "Наука",
+            "geography": "География"
+        }
+        return categories.get(category, category)
+
+    # Обработчик ответов
+    @dp.callback_query(lambda c: c.data.startswith("answer_"), QuizStates.playing)
+    async def process_answer(callback: CallbackQuery, state: FSMContext):
+        # Парсим callback_data
+        _, question_index, answer_index = callback.data.split("_")
+        question_index = int(question_index)
+        answer_index = int(answer_index)
+
+        # Получаем состояние игры
+        data = await state.get_data()
+        game: GameState = data.get('game')
+
+        if not game or game.is_finished() or game.current_index != question_index:
+            await callback.answer("Этот вопрос уже неактуален!")
+            return
+
+        # Получаем текущий вопрос
+        question = game.get_current_question()
+
+        # Проверяем правильность ответа
+
+    is_correct = (answer_index == question['correct'])
+
+    # Обновляем статистику
+    user = get_user(callback.from_user.id, callback.from_user.username)
+    user.total_answers += 1
+
+    if is_correct:
+        game.score += 10
+        user.correct_answers += 1
+        user.total_score += 10
+        result_text = "✅ <b>Правильно!</b>"
+    else:
+        correct_option = question['options'][question['correct']]
+        result_text = f"❌ <b>Неправильно!</b>\nПравильный ответ: {correct_option}"
+
+    # Добавляем объяснение
+    result_text += f"\n\n💡 {question['explanation']}"
+
+    # Сохраняем ответ
+    game.answers.append({
+        'question': question['question'],
+        'user_answer': question['options'][answer_index],
+        'correct': is_correct
+    })
+
+    # Переходим к следующему вопросу
+    game.current_index += 1
+
+    # Сохраняем обновленную игру
+    await state.update_data(game=game)
+
+    # Отправляем результат
+    await callback.message.edit_text(
+        result_text,
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="➡️ Далее", callback_data="next_question")
+        ]])
+    )
+
+    await callback.answer()
+
+    # Сохраняем данные пользователя
+    save_user_data()
+
+
+# Обработчик перехода к следующему вопросу
+@dp.callback_query(lambda c: c.data == "next_question", QuizStates.playing)
+async def process_next(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    game: GameState = data.get('game')
+
+    if not game:
+        await state.clear()
+        await callback.message.edit_text(
+            "Игра завершена. Начни новую игру с /start",
+            reply_markup=get_categories_keyboard()
+        )
+        await callback.answer()
+        return
+
+    if game.is_finished():
+        # Игра завершена
+        await finish_game(callback.message, game, state)
+        await callback.answer()
+        return
