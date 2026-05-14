@@ -1,0 +1,32 @@
+# Виртуальное окружение
+.venv/
+venv/
+env/
+ENV/
+
+# Переменные окружения (токен бота!)
+.env
+.env.*
+!.env.example
+
+# Python кэш
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+
+# БД (опционально — если не хочешь пушить базу)
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
