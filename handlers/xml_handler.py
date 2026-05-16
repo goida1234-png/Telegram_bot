@@ -11,7 +11,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 from database import get_all_sessions_for_export, import_session_from_xml
-from keyboards import xml_menu_kb, xml_import_cancel_kb, main_menu_kb
+from keyboards import xml_menu_kb, xml_import_cancel_kb, main_menu_kb, xml_export_done_kb
 
 router = Router()
 
@@ -164,13 +164,9 @@ async def export_results(callback: CallbackQuery):
         )
         return
 
-    # Генерируем XML
     xml_bytes = build_xml(data)
-
-    # Имя файла с датой
     filename = f"quiz_results_{callback.from_user.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xml"
 
-    # Считаем статистику для сообщения
     total_sessions = len(data["sessions"])
     total_answers  = sum(len(s["answers"]) for s in data["sessions"])
 
@@ -184,18 +180,11 @@ async def export_results(callback: CallbackQuery):
             f"📅 Дата:    <b>{datetime.now().strftime('%d.%m.%Y %H:%M')}</b>\n\n"
             f"💾 Сохрани файл — он понадобится для восстановления данных."
         ),
+        reply_markup=xml_export_done_kb(),
         parse_mode="HTML"
     )
 
-    await callback.message.edit_text(
-        text=(
-            "📁 <b>Экспорт / Импорт результатов</b>\n\n"
-            "✅ Файл отправлен выше ☝️\n\n"
-            "Выбери действие 👇"
-        ),
-        reply_markup=xml_menu_kb(),
-        parse_mode="HTML"
-    )
+    await callback.message.delete()
 
 
 # ───────────── ИМПОРТ ─────────────
@@ -204,7 +193,14 @@ async def export_results(callback: CallbackQuery):
 async def ask_for_xml_file(callback: CallbackQuery, state: FSMContext):
     await state.set_state(XmlState.waiting_for_file)
 
-    await callback.message.edit_text(
+    # Удаляем текущее сообщение (оно с файлом — edit_text на нём не работает)
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    # Отправляем новое сообщение
+    await callback.message.answer(
         text=(
             "📥 <b>Загрузка результатов</b>\n\n"
             "Отправь XML файл, который был ранее\n"

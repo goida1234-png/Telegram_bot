@@ -11,14 +11,28 @@ router = Router()
 
 @router.callback_query(F.data == "menu_back")
 async def show_main_menu(callback: CallbackQuery):
-    await callback.message.edit_text(
-        text=(
-            "🏠 <b>Главное меню</b>\n\n"
-            "Выбери действие 👇"
-        ),
-        reply_markup=main_menu_kb(),
-        parse_mode="HTML"
+    text = (
+        "🏠 <b>Главное меню</b>\n\n"
+        "Выбери действие 👇"
     )
+
+    try:
+        await callback.message.edit_text(
+            text=text,
+            reply_markup=main_menu_kb(),
+            parse_mode="HTML"
+        )
+    except Exception:
+        try:
+            await callback.message.delete()
+        except Exception:
+            pass
+        await callback.message.answer(
+            text=text,
+            reply_markup=main_menu_kb(),
+            parse_mode="HTML"
+        )
+
     await callback.answer()
 
 

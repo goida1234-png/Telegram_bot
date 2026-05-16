@@ -129,3 +129,10 @@ def xml_import_cancel_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="❌ Отмена", callback_data="xml_import_cancel")]
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def xml_export_done_kb() -> InlineKeyboardMarkup:
+    buttons = [
+        [InlineKeyboardButton(text="📥 Загрузить XML", callback_data="xml_import")],
+        [InlineKeyboardButton(text="🏠 Главное меню", callback_data="menu_back")],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
