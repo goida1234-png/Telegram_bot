@@ -41,8 +41,6 @@ async def main():
     dp.include_router(menu.router)
     dp.include_router(quiz.router)
 
-    # Удаляем вебхук если был, начинаем polling
-    await bot.delete_webhook(drop_pending_updates=True)
     logger.info("✅ Бот запущен, жду сообщений...")
 
     try:
