@@ -8,7 +8,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import BOT_TOKEN
 from database import init_db
-from handlers import start, menu, quiz
+from handlers import start, menu, quiz, xml_handler
 
 
 # ───────────── ЛОГИРОВАНИЕ ─────────────
@@ -40,6 +40,7 @@ async def main():
     dp.include_router(start.router)
     dp.include_router(menu.router)
     dp.include_router(quiz.router)
+    dp.include_router(xml_handler.router) 
 
     logger.info("✅ Бот запущен, жду сообщений...")
 

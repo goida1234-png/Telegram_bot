@@ -129,3 +129,108 @@ async def save_answer(
             VALUES (?, ?, ?, ?, ?, ?)
         """, (session_id, question_index, question_text, chosen_option, correct_option, int(is_correct)))
         await db.commit()
+
+# ───────────── XML EXPORT / IMPORT ─────────────
+
+async def get_all_sessions_for_export(tg_id: int) -> dict:
+    """Выгружает все данные пользователя для XML экспорта"""
+    async with aiosqlite.connect(DB_NAME) as db:
+        db.row_factory = aiosqlite.Row
+
+        # Данные пользователя
+        async with db.execute(
+            "SELECT * FROM users WHERE tg_id = ?", (tg_id,)
+        ) as cursor:
+            user = await cursor.fetchone()
+
+        if not user:
+            return {}
+
+        # Все завершённые сессии
+        async with db.execute("""
+            SELECT * FROM quiz_sessions
+            WHERE user_id = ? AND finished_at IS NOT NULL
+            ORDER BY started_at DESC
+        """, (user["id"],)) as cursor:
+            sessions = await cursor.fetchall()
+
+        result = {
+            "user": dict(user),
+            "sessions": []
+        }
+
+        # Ответы для каждой сессии
+        for session in sessions:
+            async with db.execute("""
+                SELECT * FROM answers
+                WHERE session_id = ?
+                ORDER BY question_index
+            """, (session["id"],)) as cursor:
+                answers = await cursor.fetchall()
+
+            result["sessions"].append({
+                "session": dict(session),
+                "answers": [dict(a) for a in answers]
+            })
+
+        return result
+
+
+async def import_session_from_xml(
+    tg_id: int,
+    username: str,
+    first_name: str,
+    chapter: str,
+    score: int,
+    total: int,
+    started_at: str,
+    finished_at: str,
+    answers: list
+) -> bool:
+    """Импортирует одну сессию из XML в БД"""
+    try:
+        async with aiosqlite.connect(DB_NAME) as db:
+            # Получаем или создаём пользователя
+            async with db.execute(
+                "SELECT id FROM users WHERE tg_id = ?", (tg_id,)
+            ) as cursor:
+                user_row = await cursor.fetchone()
+
+            if user_row:
+                user_id = user_row[0]
+            else:
+                async with db.execute(
+                    "INSERT INTO users (tg_id, username, first_name) VALUES (?, ?, ?)",
+                    (tg_id, username, first_name)
+                ) as cursor:
+                    user_id = cursor.lastrowid
+
+            # Создаём сессию
+            async with db.execute("""
+                INSERT INTO quiz_sessions
+                    (user_id, chapter, score, total, started_at, finished_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (user_id, chapter, score, total, started_at, finished_at)) as cursor:
+                session_id = cursor.lastrowid
+
+            # Сохраняем ответы
+            for answer in answers:
+                await db.execute("""
+                    INSERT INTO answers
+                        (session_id, question_index, question_text,
+                         chosen_option, correct_option, is_correct)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    session_id,
+                    answer["question_index"],
+                    answer["question_text"],
+                    answer["chosen_option"],
+                    answer["correct_option"],
+                    answer["is_correct"]
+                ))
+
+            await db.commit()
+            return True
+
+    except Exception:
+        return False

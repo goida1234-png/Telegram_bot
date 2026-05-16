@@ -8,6 +8,7 @@ def main_menu_kb() -> InlineKeyboardMarkup:
     buttons = [
         [InlineKeyboardButton(text="🎮 Начать викторину", callback_data="menu_play")],
         [InlineKeyboardButton(text="📊 Моя статистика",  callback_data="menu_stats")],
+        [InlineKeyboardButton(text="📁 Экспорт / Импорт", callback_data="menu_xml")],
         [InlineKeyboardButton(text="ℹ️ О боте",          callback_data="menu_about")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -109,5 +110,22 @@ def confirm_exit_kb() -> InlineKeyboardMarkup:
 def stats_back_kb() -> InlineKeyboardMarkup:
     buttons = [
         [InlineKeyboardButton(text="🏠 Главное меню", callback_data="menu_back")]
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+# ───────────── XML ЭКСПОРТ / ИМПОРТ ─────────────
+
+def xml_menu_kb() -> InlineKeyboardMarkup:
+    buttons = [
+        [InlineKeyboardButton(text="📤 Выгрузить результаты (XML)", callback_data="xml_export")],
+        [InlineKeyboardButton(text="📥 Загрузить результаты (XML)", callback_data="xml_import")],
+        [InlineKeyboardButton(text="🏠 Главное меню", callback_data="menu_back")],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def xml_import_cancel_kb() -> InlineKeyboardMarkup:
+    buttons = [
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="xml_import_cancel")]
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
